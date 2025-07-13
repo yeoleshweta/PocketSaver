@@ -1,0 +1,36 @@
+version: '3.8' # Docker Compose file format version
+
+services:
+  frontend:
+    build: ./frontend           # Look in ./frontend for Dockerfile
+    ports:
+      - "3001:3000"             # Map container port 3000 to host port 3000
+    depends_on:
+      - backend                 # Wait for backend container to be up
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:5000
+
+  backend:
+    build: ./backend            # Look in ./backend for Dockerfile
+    ports:
+      - "5001:5000"             # Map container port 5000 to host port 5000
+    depends_on:
+      - db                      # Wait for db container to be up
+    environment:
+      - DATABASE_URL=postgres://pocketsaver:pocketsaver@db:5432/pocketsaver
+
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: pocketsaver
+      POSTGRES_PASSWORD: pocketsaver
+      POSTGRES_DB: pocketsaver
+    ports:
+      - "5433:5432"  # 👈 Host 5433 → Container 5432
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:                      # Named volume for DB persistence
+
