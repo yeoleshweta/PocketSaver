@@ -1,11 +1,13 @@
+// backend/db.js
+
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  user: 'pocketsaver',          // Same as POSTGRES_USER in docker-compose.yml
-  host: 'db',                   // Service name of the DB container in Docker
-  database: 'pocketsaver',      // Same as POSTGRES_DB
-  password: 'pocketsaver',      // Same as POSTGRES_PASSWORD
-  port: 5432                    // Postgres default port inside Docker
+  user:     process.env.DB_USER     || 'pocketsaver',
+  host:     process.env.DB_HOST     || 'db',
+  database: process.env.DB_NAME     || 'pocketsaver',
+  password: process.env.DB_PASS     || 'pocketsaver',
+  port:     parseInt(process.env.DB_PORT, 10) || 5432
 });
 
 module.exports = pool;

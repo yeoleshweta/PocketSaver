@@ -1,18 +1,18 @@
-# Use Node.js LTS image
-FROM node:20
+# backend/Dockerfile
+FROM node:20-slim
 
-# Set working directory
-WORKDIR /app
+WORKDIR /usr/src/app
 
-# Copy package.json and install dependencies
+# Install build tools for native modules
+RUN apt-get update \
+  && apt-get install -y build-essential python3 --no-install-recommends \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
 RUN npm install
+# Force rebuild bcrypt to match container arch
+RUN npm rebuild bcrypt --build-from-source
 
-# Copy the rest of your backend code
 COPY . .
-
-# Expose backend port
 EXPOSE 5000
-
-# Start the backend server
-CMD ["node", "server.js"]
+CMD ["npm", "run", "dev"]

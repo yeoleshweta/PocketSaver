@@ -1,12 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://backend:5000/api/:path*',
-      },
-    ];
+  reactStrictMode: true,
+  experimental: {
+    optimizeCss: false, // avoid LightningCSS issues
   },
 };
 
