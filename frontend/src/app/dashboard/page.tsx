@@ -1,52 +1,127 @@
-// frontend/src/app/dashboard/page.tsx
-'use client';
+'use client'
 
-import React from 'react';
-import ProtectedRoute from '../../components/ProtectedRoute';
-import DashboardHeader from '../../components/organisms/DashboardHeader';
-import SavingsOverview from '../../components/molecules/SavingsCard';
-import GoalProgress from '../../components/molecules/GoalProgress';
-import GhostToggle from '../../components/atoms/GhostToggle';
-import SubscriptionsList, {
-  Subscription,
-} from '../../components/molecules/SubscriptionCard';
+import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
+import DashboardHeader from '@/components/organisms/DashboardHeader'
+import SavingsCard from '@/components/molecules/SavingsCard'
+import SubscriptionCard, {
+  Subscription as SubscriptionType,
+} from '@/components/molecules/SubscriptionCard'
+import Toggle from '@/components/atoms/Toggle'
+import TransactionsDropdown from '@/components/organisms/TransactionsDropdown'
+
+interface Savings {
+  current: number
+  goal: number
+  weekly_contribution: number
+  ghost_mode: boolean
+}
+
+interface ApiSubscription {
+  name: string
+  cost: number
+  last_used: string
+  suggest_cancel: boolean
+}
 
 export default function DashboardPage() {
-  // TODO: replace these stubs with SWR + fetch to /api/dashboard
-  const current = 340.75;
-  const goal = 2000;
-  const weekly = 10;
-  const weeksToGoal = Math.ceil((goal - current) / weekly);
-  const subscriptions: Subscription[] = [
-    { name: 'Netflix', cost: 15.99, lastUsed: '2025-06-10', suggestCancel: false },
-    { name: 'Adobe CC', cost: 52.99, lastUsed: '2025-01-20', suggestCancel: true },
-  ];
+  const { user, isLoading } = useAuth()
+  const router = useRouter()
+  const token =
+    typeof window !== 'undefined' ? localStorage.getItem('token') : null
+
+  // redirect if not logged in
+  useEffect(() => {
+    if (!isLoading && !user) router.replace('/')
+  }, [isLoading, user, router])
+
+  const [savings, setSavings] = useState<Savings>({
+    current: 0,
+    goal: 0,
+    weekly_contribution: 0,
+    ghost_mode: false,
+  })
+  const [subscriptions, setSubscriptions] = useState<SubscriptionType[]>([])
+  const [ghostMode, setGhostMode] = useState(false)
+
+  // fetch dashboard, unchanged from your code
+  const fetchDashboard = useCallback(async () => {
+    if (!token) return
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/dashboard`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    )
+    if (!res.ok) return
+    const data = await res.json()
+    setSavings(data.savings)
+    setGhostMode(data.savings.ghost_mode)
+    const subs = (data.subscriptions as ApiSubscription[]).map((s) => ({
+      name: s.name,
+      cost: s.cost,
+      lastUsed: s.last_used,
+      suggestCancel: s.suggest_cancel,
+    }))
+    setSubscriptions(subs)
+  }, [token])
+
+  useEffect(() => {
+    if (user && token) fetchDashboard()
+  }, [user, token, fetchDashboard])
+
+  const handleGhostToggle = async (enabled: boolean) => {
+    if (!token) return
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user/ghost`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ enabled }),
+    })
+    setGhostMode(enabled)
+  }
+
+  const weeksToGoal = savings.weekly_contribution
+    ? Math.ceil((savings.goal - savings.current) / savings.weekly_contribution)
+    : 0
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-teal-50">
-        <DashboardHeader />
+    <div className="min-h-screen bg-teal-50">
+      <DashboardHeader />
+      <main className="p-6 space-y-8 max-w-4xl mx-auto">
+        <SavingsCard
+          current={Number(savings.current)}
+          goal={Number(savings.goal)}
+          weeksToGoal={weeksToGoal}
+        />
 
-        <main className="p-6 space-y-8 max-w-4xl mx-auto">
-          <SavingsOverview current={current} goal={goal} weeksToGoal={weeksToGoal} />
+        <section className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
+          <h2 className="text-lg font-medium">Stealth Saving</h2>
+          <Toggle
+            label="Ghost Mode"
+            checked={ghostMode}
+            onChange={handleGhostToggle}
+          />
+        </section>
 
-          <GoalProgress current={current} target={goal} label="Total Progress" />
+        <section className="space-y-4">
+          <SubscriptionCard subscriptions={subscriptions} />
+        </section>
 
-          <section className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
-            <h2 className="text-lg font-medium">Stealth Saving</h2>
-            <GhostToggle />
-          </section>
+        <section className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-2">Spending Insights</h2>
+          <p className="text-gray-600">
+            You could save <strong>$25/mo</strong> by cancelling unused
+            services.
+          </p>
+        </section>
 
-          <SubscriptionsList subscriptions={subscriptions} />
-
-          <section className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-2">Spending Insights</h2>
-            <p className="text-gray-600">
-              You could save <strong>$25/mo</strong> by cancelling unused services.
-            </p>
-          </section>
-        </main>
-      </div>
-    </ProtectedRoute>
-  );
+        {/* ← Here’s your dummy‐data dropdown */}
+        <TransactionsDropdown />
+      </main>
+    </div>
+  )
 }

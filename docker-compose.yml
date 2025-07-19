@@ -1,5 +1,4 @@
-version: "3.8"
-
+# docker-compose.yml
 services:
   db:
     image: postgres:16
@@ -20,32 +19,30 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "5001:5000"            # container’s 5000 → host 5001
+      - "5001:5000"         # map container’s 5000 → host 5001
     env_file:
-      - ./backend/.env
+      - ./backend/.env      # holds JWT_SECRET, etc.
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - ./backend:/usr/src/app # live‐reload backend
+      - ./backend:/usr/src/app
     command: npm run dev
 
   frontend:
-    platform: linux/amd64     # ensure Node image matches LightningCSS binary
+    platform: linux/amd64   # if you’re on Apple Silicon
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3001:3000"            # container’s 3000 → host 3001
-    env_file:
-      - ./frontend/.env.local
+      - "3001:3000"         # map container’s 3000 → host 3001
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:5001
+      NEXT_PUBLIC_API_URL: http://backend:5000
     depends_on:
       - backend
     volumes:
-      - ./frontend:/app        # live‐reload frontend
-      - /app/node_modules      # preserve container’s modules
+      - ./frontend:/app
+      - /app/node_modules
     command: npm run dev
 
 volumes:
