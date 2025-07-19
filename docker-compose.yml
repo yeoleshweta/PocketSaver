@@ -1,36 +1,49 @@
-version: '3.8' # Docker Compose file format version
-
+# docker-compose.yml
 services:
-  frontend:
-    build: ./frontend           # Look in ./frontend for Dockerfile
-    ports:
-      - "3001:3000"             # Map container port 3000 to host port 3000
-    depends_on:
-      - backend                 # Wait for backend container to be up
-    environment:
-      - NEXT_PUBLIC_API_URL=http://backend:5000
-
-  backend:
-    build: ./backend            # Look in ./backend for Dockerfile
-    ports:
-      - "5001:5000"             # Map container port 5000 to host port 5000
-    depends_on:
-      - db                      # Wait for db container to be up
-    environment:
-      - DATABASE_URL=postgres://pocketsaver:pocketsaver@db:5432/pocketsaver
-
   db:
     image: postgres:16
-    restart: always
     environment:
       POSTGRES_USER: pocketsaver
-      POSTGRES_PASSWORD: pocketsaver
+      POSTGRES_PASSWORD: hunter2
       POSTGRES_DB: pocketsaver
-    ports:
-      - "5433:5432"  # 👈 Host 5433 → Container 5432
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pocketsaver"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5000"         # map container’s 5000 → host 5001
+    env_file:
+      - ./backend/.env      # holds JWT_SECRET, etc.
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/usr/src/app
+    command: npm run dev
+
+  frontend:
+    platform: linux/amd64   # if you’re on Apple Silicon
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"         # map container’s 3000 → host 3001
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:5000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev
 
 volumes:
-  db_data:                      # Named volume for DB persistence
-
+  db-data:
