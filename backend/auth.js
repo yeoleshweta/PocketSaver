@@ -1,20 +1,16 @@
-// backend/auth.js
+// ── backend/auth.js ─────────────────────────────────────────────
 const jwt = require('jsonwebtoken');
 
-function requireAuth(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth) return res.status(401).json({ message: 'No authorization header' });
-
-  const [, token] = auth.split(' ');
-  if (!token) return res.status(401).json({ message: 'Malformed auth header' });
-
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload;
-    next();
-  } catch {
-    res.status(401).json({ message: 'Invalid or expired token' });
+module.exports = function requireAuth(req, res, next) {
+  const auth = req.headers.authorization?.split(' ');
+  if (!auth || auth[0] !== 'Bearer') {
+    return res.status(401).json({ message: 'Missing token' });
   }
-}
-
-module.exports = requireAuth;
+  try {
+    const payload = jwt.verify(auth[1], process.env.JWT_SECRET);
+    req.user = { id: payload.id, email: payload.email };
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: 'Invalid token' });
+  }
+};
