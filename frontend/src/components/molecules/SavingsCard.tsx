@@ -5,53 +5,74 @@ interface Props {
   current: number;
   goal: number;
   weeksToGoal: number;
+  roundUpSavings?: number; // New prop for round-up savings display
 }
 
-export default function SavingsCard({ current, goal, weeksToGoal }: Props) {
+export default function SavingsCard({ 
+  current, 
+  goal, 
+  weeksToGoal, 
+  roundUpSavings = 0 
+}: Props) {
   const progress = goal > 0 ? Math.min(current / goal, 1) : 0;
 
   return (
-    <section className="bg-white p-6 rounded-lg shadow space-y-4">
-      <h2 className="text-xl font-semibold">Your Savings</h2>
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        Your Savings
+      </h3>
+
+      {/* Round-Up Savings Display - NEW SECTION */}
+      <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-medium text-green-700">
+            Round-Up Savings
+          </span>
+          <span className="text-lg font-bold text-green-800">
+            ${roundUpSavings.toFixed(2)}
+          </span>
+        </div>
+        <p className="text-xs text-green-600 mt-1">
+          Total saved from transaction round-ups
+        </p>
+      </div>
 
       {/* Progress Bar */}
-      <div>
-        <div className="w-full bg-gray-200 rounded-full h-4">
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm font-medium text-gray-700">Progress</span>
+          <span className="text-sm text-gray-500">
+            {(progress * 100).toFixed(1)}%
+          </span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-3">
           <div
-            className="h-4 rounded-full bg-teal-600"
-            style={{ width: `${(progress * 100).toFixed(1)}%` }}
+            className="bg-blue-500 h-3 rounded-full transition-all duration-300"
+            style={{ width: `${progress * 100}%` }}
           />
         </div>
-        <p className="mt-2 text-sm">
+        <p className="text-sm text-gray-600 mt-2">
           Saved <strong>${current.toFixed(2)}</strong> of ${goal.toFixed(2)} (
           {(progress * 100).toFixed(1)}%)
         </p>
       </div>
 
       {/* Weeks to Goal */}
-      <p className="text-sm text-gray-600">
-        {weeksToGoal} week{weeksToGoal !== 1 ? 's' : ''} to reach your goal
-      </p>
+      <div className="mb-6">
+        <p className="text-sm text-gray-500">
+          {weeksToGoal} week{weeksToGoal !== 1 ? 's' : ''} to reach your goal
+        </p>
+      </div>
 
-      {/* Withdraw / Invest Buttons */}
-      <div className="flex gap-4">
-        <button
-          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          onClick={() => {
-            /* wire up later */
-          }}
-        >
+      {/* Action Buttons */}
+      <div className="flex gap-3">
+        <button className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors">
           Withdraw
         </button>
-        <button
-          className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-          onClick={() => {
-            /* wire up later */
-          }}
-        >
+        <button className="flex-1 bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 transition-colors">
           Invest
         </button>
       </div>
-    </section>
+    </div>
   );
 }
