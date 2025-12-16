@@ -1,41 +1,39 @@
-// frontend/src/components/molecules/SubscriptionsList.tsx
 import React from 'react';
 
+// Define the expected subscription interface
 export interface Subscription {
   name: string;
   cost: number;
-  lastUsed: string;
-  suggestCancel: boolean;
+  lastUsed: string;      // camelCase
+  suggestCancel: boolean; // camelCase
 }
 
-interface SubscriptionsListProps {
-  subscriptions: Subscription[];
+interface Props {
+  subscription: Subscription;
 }
 
-export default function SubscriptionsList({
-  subscriptions,
-}: SubscriptionsListProps) {
+export default function SubscriptionCard({ subscription }: Props) {
+  const { name, cost, lastUsed, suggestCancel } = subscription;
+  
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Your Subscriptions</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {subscriptions.map((sub) => (
-          <div
-            key={sub.name}
-            className="bg-white rounded-lg shadow p-4 flex justify-between items-center"
-          >
-            <div>
-              <h3 className="font-medium">{sub.name}</h3>
-              <p className="text-sm text-gray-500">${sub.cost.toFixed(2)}/mo</p>
-              <p className="text-xs text-gray-400">Last used: {sub.lastUsed}</p>
-            </div>
-            {sub.suggestCancel && (
-              <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full">
-                Cancel?
-              </span>
-            )}
-          </div>
-        ))}
+    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+      <div className="flex-1">
+        <h4 className="font-medium text-gray-900">{name}</h4>
+        <p className="text-sm text-gray-500">
+          Last used: {new Date(lastUsed).toLocaleDateString()}
+        </p>
+      </div>
+      
+      <div className="flex items-center gap-3">
+        <span className="font-semibold text-gray-900">
+          ${cost.toFixed(2)}/mo
+        </span>
+        
+        {suggestCancel && (
+          <button className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition-colors">
+            Cancel
+          </button>
+        )}
       </div>
     </div>
   );

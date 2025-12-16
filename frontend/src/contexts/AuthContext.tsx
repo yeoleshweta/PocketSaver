@@ -1,86 +1,134 @@
-'use client';
+'use client'
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+interface User {
+  id?: string | number;
+  email?: string;
+  name?: string;
+  username?: string;
+}
+
+interface AuthResult {
+  success: boolean;
+  message?: string;
+}
 
 interface AuthContextType {
-  user: { id: number; email: string } | null;
-  token: string | null;
+  user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string; token?: string }>;
-  register: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  register: (email: string, password: string) => Promise<AuthResult>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<{ id: number; email: string } | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
+interface AuthProviderProps {
+  children: ReactNode;
+}
 
-  // On mount, check localStorage for token
+export function AuthProvider({ children }: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
-    const t = localStorage.getItem('token');
-    if (t) {
-      setToken(t);
-      try {
-        const payload = JSON.parse(atob(t.split('.')[1]));
-        setUser({ id: payload.id, email: payload.email });
-      } catch {
-        localStorage.removeItem('token');
-        setToken(null);
-      }
+    // Check for existing auth token/session
+    const token = localStorage.getItem('token');
+    if (token) {
+      // Fetch user data or validate token
+      fetchUserData();
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-    if (data.success && data.token) {
-      localStorage.setItem('token', data.token);
-      setToken(data.token);
-      try {
-        const payload = JSON.parse(atob(data.token.split('.')[1]));
-        setUser({ id: payload.id, email: payload.email });
-      } catch {
-        // ignore
+  const fetchUserData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user`, {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
       }
+    } catch (error) {
+      console.error('Failed to fetch user ', error);
+    } finally {
+      setIsLoading(false);
     }
-    return data;
   };
 
-  const register = async (email: string, password: string) => {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    return res.json();
+  const login = async (email: string, password: string): Promise<AuthResult> => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('token', data.token);
+        setUser(data.user);
+        return { success: true };
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        return { success: false, message: errorData.message || 'Login failed' };
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return { success: false, message: 'An error occurred during login' };
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const logout = () => {
+  const register = async (email: string, password: string): Promise<AuthResult> => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      
+      if (response.ok) {
+        return { success: true, message: 'Registration successful' };
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        return { success: false, message: errorData.message || 'Registration failed' };
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      return { success: false, message: 'An error occurred during registration' };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
     localStorage.removeItem('token');
-    setToken(null);
     setUser(null);
-    router.replace('/');
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
+export function useAuth(): AuthContextType {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }
