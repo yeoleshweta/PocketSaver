@@ -1,9 +1,9 @@
-<<<<<<< HEAD
 # PocketPilot Ultimate - Setup & Run Guide
 
 This guide details how to set up and run the PocketPilot Ultimate application locally.
 
 ## Prerequisites
+
 - **Node.js** (v18+ recommended)
 - **Python** (v3.9+)
 - **PostgreSQL** (v14+)
@@ -16,14 +16,18 @@ This guide details how to set up and run the PocketPilot Ultimate application lo
 Running the application manually ensures all services (Frontend, Backend, Forecast Engine) are active.
 
 ### 1. Database Setup
+
 Ensure you have a PostgreSQL database running.
+
 ```bash
 # Example: Create a database named 'pocketsaver'
 createdb pocketsaver
 ```
-*Update the `DATABASE_URL` in `backend/.env` if your credentials differ.*
+
+_Update the `DATABASE_URL` in `backend/.env` if your credentials differ._
 
 ### 2. Forecast Service (Python)
+
 This service must be running for predictions to work.
 
 1. Navigate to the service directory:
@@ -46,9 +50,11 @@ This service must be running for predictions to work.
    ```
 
 ### 3. Backend & Frontend
+
 The root directory allows running both web services simultaneously.
 
 1. Install dependencies:
+
    ```bash
    # Root (for concurrency)
    npm install
@@ -63,6 +69,7 @@ The root directory allows running both web services simultaneously.
    ```
 
 2. Environment Configuration:
+
    - Ensure `backend/.env` has the correct `DATABASE_URL` and `FORECAST_URL` (usually `http://localhost:8080/predict`).
    - Ensure `frontend/.env.local` has `NEXT_PUBLIC_API_URL` (e.g., `http://localhost:5001` or `http://localhost:5000`).
 
@@ -78,14 +85,16 @@ The root directory allows running both web services simultaneously.
 
 ## 🐳 Docker Setup
 
-You can run the web stack (Frontend + Backend + DB) using Docker Compose. 
+You can run the web stack (Frontend + Backend + DB) using Docker Compose.
 
 **Note**: The current `docker-compose.yml` **does not include the Python Forecast Service**. You will still need to run the Python service manually (Step 2 above) or add it to the compose file for full functionality.
 
 ```bash
 docker-compose up --build
 ```
+
 This will start:
+
 - **Postgres Database**
 - **Backend API** (mapped to port 5001)
 - **Frontend App** (mapped to port 3001)
@@ -95,13 +104,11 @@ This will start:
 ## API Endpoints
 
 ### Backend
+
 - `GET /health` - Check if backend is running.
 - `POST /api/register` - Register a new user.
 - `POST /api/forecast` - Proxy request to the Python service.
 
 ### Forecast Service
+
 - `POST /predict` - Direct endpoint to get prediction (requires JSON body with `days_since_start`, `current_price`, `horizon`).
-=======
-# PocketSaver
-A lightweight fullstack expense tracker app with a clean UI, Dockerized backend/frontend, and PostgreSQL database.
->>>>>>> 5befdbd3f2b860af1765c66a8fd6cd2c060c2515
