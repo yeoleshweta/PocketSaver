@@ -1,7 +1,9 @@
-# docker-compose.yml
 services:
   db:
     image: postgres:16
+    restart: always
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: pocketsaver
       POSTGRES_PASSWORD: hunter2
@@ -9,7 +11,7 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pocketsaver"]
+      test: ["CMD", "pg_isready", "-U", "pocketsaver"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -19,30 +21,31 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "5001:5000"         # map container’s 5000 → host 5001
+      - "5001:5000"              # host:container
     env_file:
-      - ./backend/.env      # holds JWT_SECRET, etc.
+      - ./backend/.env
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - ./backend:/usr/src/app
+      - ./backend:/usr/src/app   # live‐reload backend
     command: npm run dev
 
   frontend:
-    platform: linux/amd64   # if you’re on Apple Silicon
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3001:3000"         # map container’s 3000 → host 3001
+      - "3001:3000"              # host:container
+    env_file:
+      - ./frontend/.env.local
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:5000
+      NEXT_PUBLIC_API_URL: http://localhost:5000
     depends_on:
       - backend
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend:/app          # live‐reload frontend
+      - /app/node_modules        # preserve container’s modules
     command: npm run dev
 
 volumes:
