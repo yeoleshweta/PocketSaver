@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # PocketPilot Ultimate - Setup & Run Guide
 
 This guide details how to set up and run the PocketPilot Ultimate application locally.
@@ -100,3 +101,7 @@ This will start:
 
 ### Forecast Service
 - `POST /predict` - Direct endpoint to get prediction (requires JSON body with `days_since_start`, `current_price`, `horizon`).
+=======
+# PocketSaver
+A lightweight fullstack expense tracker app with a clean UI, Dockerized backend/frontend, and PostgreSQL database.
+>>>>>>> 5befdbd3f2b860af1765c66a8fd6cd2c060c2515
