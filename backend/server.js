@@ -18,9 +18,21 @@ const { Pool } = pkg;
 /* -------------------------------------------------
    2️⃣  Database connection (PostgreSQL)
 --------------------------------------------------*/
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL   // put this in .env
-});
+import { MockPool } from './mockPool.js';
+
+/* -------------------------------------------------
+   2️⃣  Database connection (PostgreSQL or Mock)
+--------------------------------------------------*/
+const useMock = process.env.USE_MOCK === 'true' || !process.env.DATABASE_URL;
+if (useMock) {
+  console.log('⚠️  Using In-Memory Mock Database');
+}
+
+const pool = useMock 
+  ? new MockPool() 
+  : new Pool({
+      connectionString: process.env.DATABASE_URL
+    });
 
 /* -------------------------------------------------
    3️⃣  App & middleware
@@ -195,7 +207,289 @@ app.patch('/api/user/ghost', requireAuth, async (req, res) => {
 });
 
 /* -------------------------------------------------
-   6️⃣  Forecast proxy → Python microservice
+   6️⃣  Transaction CRUD with Auto-Categorization
+--------------------------------------------------*/
+import { categorizeTransaction, getCategories, categorizeTransactions } from './services/categorizer.js';
+
+// Get all categories
+app.get('/api/categories', (_req, res) => {
+  res.json(getCategories());
+});
+
+// Get user's transactions with optional filters
+app.get('/api/transactions', requireAuth, async (req, res) => {
+  try {
+    const { category, limit = 100, offset = 0, startDate, endDate } = req.query;
+    
+    let query = `
+      SELECT id, amount, rounded_diff, merchant, description, category, created_at 
+      FROM transactions 
+      WHERE user_id = $1
+    `;
+    const params = [req.user.id];
+    let paramIndex = 2;
+
+    if (category && category !== 'All') {
+      query += ` AND category = $${paramIndex}`;
+      params.push(category);
+      paramIndex++;
+    }
+
+    if (startDate) {
+      query += ` AND created_at >= $${paramIndex}`;
+      params.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      query += ` AND created_at <= $${paramIndex}`;
+      params.push(endDate);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(parseInt(limit), parseInt(offset));
+
+    const { rows } = await pool.query(query, params);
+    res.json(rows);
+  } catch (err) {
+    console.error('Get transactions error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Add new transaction with auto-categorization
+app.post('/api/transactions', requireAuth, async (req, res) => {
+  try {
+    const { amount, merchant, description, category: manualCategory } = req.body;
+
+    if (!amount) {
+      return res.status(400).json({ error: 'Amount is required' });
+    }
+
+    // Auto-categorize if no category provided
+    const category = manualCategory || categorizeTransaction(merchant, description, amount);
+    
+    // Calculate round-up (round to nearest dollar)
+    const roundedAmount = Math.ceil(Math.abs(amount));
+    const roundedDiff = roundedAmount - Math.abs(amount);
+
+    const insert = `
+      INSERT INTO transactions (user_id, amount, rounded_diff, merchant, description, category)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `;
+    const { rows } = await pool.query(insert, [
+      req.user.id,
+      amount,
+      roundedDiff,
+      merchant || null,
+      description || null,
+      category
+    ]);
+
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('Add transaction error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update transaction category (manual override)
+app.patch('/api/transactions/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category, merchant, description } = req.body;
+
+    const update = `
+      UPDATE transactions 
+      SET category = COALESCE($1, category),
+          merchant = COALESCE($2, merchant),
+          description = COALESCE($3, description)
+      WHERE id = $4 AND user_id = $5
+      RETURNING *
+    `;
+    const { rows } = await pool.query(update, [category, merchant, description, id, req.user.id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Update transaction error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete transaction
+app.delete('/api/transactions/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'DELETE FROM transactions WHERE id = $1 AND user_id = $2 RETURNING id',
+      [id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    res.json({ success: true, deletedId: id });
+  } catch (err) {
+    console.error('Delete transaction error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get spending summary by category
+app.get('/api/spending-summary', requireAuth, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    let query = `
+      SELECT 
+        category,
+        COUNT(*) as transaction_count,
+        SUM(ABS(amount)) as total_spent,
+        SUM(rounded_diff) as total_round_up
+      FROM transactions 
+      WHERE user_id = $1 AND amount > 0
+    `;
+    const params = [req.user.id];
+    let paramIndex = 2;
+
+    if (startDate) {
+      query += ` AND created_at >= $${paramIndex}`;
+      params.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      query += ` AND created_at <= $${paramIndex}`;
+      params.push(endDate);
+    }
+
+    query += ' GROUP BY category ORDER BY total_spent DESC';
+
+    const { rows } = await pool.query(query, params);
+    
+    // Add category metadata
+    const categories = getCategories();
+    const enrichedRows = rows.map(row => {
+      const cat = categories.find(c => c.name === row.category) || {};
+      return {
+        ...row,
+        icon: cat.icon || '📦',
+        color: cat.color || '#6B7280'
+      };
+    });
+
+    res.json(enrichedRows);
+  } catch (err) {
+    console.error('Spending summary error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Seed sample transactions for demo
+app.post('/api/transactions/seed', requireAuth, async (req, res) => {
+  try {
+    const sampleTransactions = [
+      { amount: 12.50, merchant: 'Starbucks', description: 'Morning coffee' },
+      { amount: 45.00, merchant: 'Shell Gas Station', description: 'Fuel' },
+      { amount: 89.99, merchant: 'Amazon', description: 'Electronics purchase' },
+      { amount: 15.99, merchant: 'Netflix', description: 'Monthly subscription' },
+      { amount: 32.40, merchant: 'Chipotle', description: 'Lunch' },
+      { amount: 150.00, merchant: 'Electric Company', description: 'Utility bill' },
+      { amount: 25.00, merchant: 'Uber', description: 'Ride to airport' },
+      { amount: 8.50, merchant: 'Dunkin Donuts', description: 'Breakfast' },
+      { amount: 200.00, merchant: 'Target', description: 'Home supplies' },
+      { amount: 50.00, merchant: 'Planet Fitness', description: 'Gym membership' }
+    ];
+
+    const inserted = [];
+    for (const tx of sampleTransactions) {
+      const category = categorizeTransaction(tx.merchant, tx.description, tx.amount);
+      const roundedDiff = Math.ceil(tx.amount) - tx.amount;
+      
+      const { rows } = await pool.query(
+        `INSERT INTO transactions (user_id, amount, rounded_diff, merchant, description, category)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [req.user.id, tx.amount, roundedDiff, tx.merchant, tx.description, category]
+      );
+      inserted.push(rows[0]);
+    }
+
+    res.status(201).json({ message: `Seeded ${inserted.length} transactions`, transactions: inserted });
+  } catch (err) {
+    console.error('Seed transactions error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* -------------------------------------------------
+   6.5️⃣  Budget Management
+--------------------------------------------------*/
+
+// Get user budgets
+app.get('/api/budgets', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM budgets WHERE user_id = $1 ORDER BY category', 
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Get budgets error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Set/Update budget for a category
+app.post('/api/budgets', requireAuth, async (req, res) => {
+  try {
+    const { category, monthly_limit } = req.body;
+
+    if (!category || !monthly_limit) {
+      return res.status(400).json({ error: 'Category and limit are required' });
+    }
+
+    const query = `
+      INSERT INTO budgets (user_id, category, monthly_limit)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (user_id, category) 
+      DO UPDATE SET monthly_limit = $3, created_at = NOW()
+      RETURNING *
+    `;
+    
+    const { rows } = await pool.query(query, [req.user.id, category, monthly_limit]);
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Set budget error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete budget
+app.delete('/api/budgets/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await pool.query(
+      'DELETE FROM budgets WHERE id = $1 AND user_id = $2 RETURNING *',
+      [id, req.user.id]
+    );
+    
+    if (rows.length === 0) return res.status(404).json({ error: 'Budget not found' });
+    res.json({ success: true, deletedBudget: rows[0] });
+  } catch (err) {
+    console.error('Delete budget error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* -------------------------------------------------
+   7️⃣  Forecast proxy → Python microservice
 --------------------------------------------------*/
 const FORECAST_URL = process.env.FORECAST_URL || 'http://localhost:8080/predict';
 

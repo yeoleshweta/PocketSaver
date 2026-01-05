@@ -1,15 +1,16 @@
 // src/app/page.tsx
-'use client';
+"use client";
 
-import { useState, useEffect, FormEvent } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, FormEvent } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import { useRouter } from "next/navigation";
 
 export default function AuthPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [message, setMessage] = useState('');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { login, register, user, isLoading } = useAuth();
@@ -17,21 +18,21 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (user && !isLoading) {
-      router.replace('/dashboard');
+      router.replace("/dashboard");
     }
   }, [user, isLoading, router]);
 
   const validateForm = () => {
-    if (!email || !password) {
-      setMessage('❌ Please fill in all fields');
+    if (!email || !password || (mode === "register" && !name)) {
+      setMessage("❌ Please fill in all fields");
       return false;
     }
     if (!/\S+@\S+\.\S+/.test(email)) {
-      setMessage('❌ Please enter a valid email');
+      setMessage("❌ Please enter a valid email");
       return false;
     }
     if (password.length < 6) {
-      setMessage('❌ Password must be at least 6 characters');
+      setMessage("❌ Password must be at least 6 characters");
       return false;
     }
     return true;
@@ -39,28 +40,28 @@ export default function AuthPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setMessage('');
+    setMessage("");
     if (!validateForm()) return;
 
     setIsSubmitting(true);
     try {
       const result =
-        mode === 'login'
+        mode === "login"
           ? await login(email, password)
-          : await register(email, password);
+          : await register(name, email, password);
 
       if (result.success) {
         setMessage(
-          mode === 'login'
-            ? '✅ Login successful!'
-            : '✅ Registration successful! Please log in.'
+          mode === "login"
+            ? "✅ Login successful!"
+            : "✅ Registration successful! Please log in."
         );
-        if (mode === 'register') setMode('login');
+        if (mode === "register") setMode("login");
       } else {
-        setMessage(`❌ ${result.message || 'Operation failed'}`);
+        setMessage(`❌ ${result.message || "Operation failed"}`);
       }
     } catch {
-      setMessage('❌ An unexpected error occurred');
+      setMessage("❌ An unexpected error occurred");
     } finally {
       setIsSubmitting(false);
     }
@@ -78,10 +79,22 @@ export default function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
         <h1 className="text-2xl font-bold mb-6 text-center">
-          {mode === 'login' ? 'Login to PocketSaver' : 'Register for PocketSaver'}
+          {mode === "login"
+            ? "Login to PocketSaver"
+            : "Register for PocketSaver"}
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === "register" && (
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Full Name"
+              className="w-full p-3 border rounded"
+              disabled={isSubmitting}
+            />
+          )}
           <input
             type="email"
             value={email}
@@ -94,7 +107,7 @@ export default function AuthPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
+            placeholder="Password (min 6 characters)"
             className="w-full p-3 border rounded"
             disabled={isSubmitting}
             minLength={6}
@@ -105,17 +118,17 @@ export default function AuthPage() {
             className="w-full bg-primary text-white p-3 rounded"
           >
             {isSubmitting
-              ? 'Processing…'
-              : mode === 'login'
-              ? 'Login'
-              : 'Register'}
+              ? "Processing…"
+              : mode === "login"
+              ? "Login"
+              : "Register"}
           </button>
         </form>
 
         {message && (
           <p
             className={`mt-4 text-center ${
-              message.startsWith('✅') ? 'text-green-600' : 'text-red-600'
+              message.startsWith("✅") ? "text-green-600" : "text-red-600"
             }`}
           >
             {message}
@@ -124,11 +137,11 @@ export default function AuthPage() {
 
         <p
           className="mt-4 text-center text-blue-500 cursor-pointer"
-          onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+          onClick={() => setMode(mode === "login" ? "register" : "login")}
         >
-          {mode === 'login'
+          {mode === "login"
             ? "Don't have an account? Register."
-            : 'Have an account? Login.'}
+            : "Have an account? Login."}
         </p>
       </div>
     </div>
