@@ -1,0 +1,19 @@
+# PocketPilot Ultimate - Supabase Configuration
+# For more information, see: https://supabase.com/docs/guides/cli/config
+
+[project]
+id = "your-project-ref"  # Replace with your Supabase project ref
+
+[db]
+# Port to use for the local database
+port = 54322
+# The database major version to use
+major_version = 15
+
+[api]
+# Port to use for the local API
+port = 54321
+
+[studio]
+# Port to use for the local Supabase Studio
+port = 54323

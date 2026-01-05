@@ -15,16 +15,50 @@ This guide details how to set up and run the PocketPilot Ultimate application lo
 
 Running the application manually ensures all services (Frontend, Backend, Forecast Engine) are active.
 
-### 1. Database Setup
+### 1. Database Setup (Supabase)
 
-Ensure you have a PostgreSQL database running.
+We recommend using **Supabase** for the database. Follow these steps:
+
+#### a. Create a Supabase Project
+
+1. Go to [supabase.com](https://supabase.com) and create a new project
+2. Wait for the project to be provisioned
+
+#### b. Set Up the Database Schema
+
+1. In your Supabase dashboard, go to **SQL Editor** → **New Query**
+2. Copy the contents of `backend/db/supabase_schema.sql` and run it
+3. This creates all necessary tables (users, transactions, savings, subscriptions, budgets, categories)
+
+#### c. Get Your API Keys
+
+1. Go to **Settings** → **API** in your Supabase dashboard
+2. Copy the following values:
+   - **Project URL** (e.g., `https://xxxxx.supabase.co`)
+   - **service_role** key (secret - keep this safe!)
+
+#### d. Configure Environment Variables
+
+1. Copy the example env file:
+   ```bash
+   cp backend/.env.example backend/.env
+   ```
+2. Update `backend/.env` with your Supabase credentials:
+   ```env
+   DATABASE_MODE=supabase
+   SUPABASE_URL=https://your-project-id.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   JWT_SECRET=your-secret-key
+   ```
+
+#### Alternative: Local PostgreSQL
+
+If you prefer local development with Docker:
 
 ```bash
-# Example: Create a database named 'pocketsaver'
-createdb pocketsaver
+# Set DATABASE_MODE=local in backend/.env
+docker-compose up db
 ```
-
-_Update the `DATABASE_URL` in `backend/.env` if your credentials differ._
 
 ### 2. Forecast Service (Python)
 

@@ -16,23 +16,33 @@ import jwt from 'jsonwebtoken';
 const { Pool } = pkg;
 
 /* -------------------------------------------------
-   2️⃣  Database connection (PostgreSQL)
+   2️⃣  Database connection (Supabase, Mock, or Local)
 --------------------------------------------------*/
 import { MockPool } from './mockPool.js';
+import { SupabasePool, supabase } from './supabase.js';
 
-/* -------------------------------------------------
-   2️⃣  Database connection (PostgreSQL or Mock)
---------------------------------------------------*/
-const useMock = process.env.USE_MOCK === 'true' || !process.env.DATABASE_URL;
-if (useMock) {
-  console.log('⚠️  Using In-Memory Mock Database');
-}
+// Database mode: 'supabase', 'mock', or 'local'
+const DATABASE_MODE = process.env.DATABASE_MODE || 'mock';
 
-const pool = useMock 
-  ? new MockPool() 
-  : new Pool({
+let pool;
+
+switch (DATABASE_MODE) {
+  case 'supabase':
+    console.log('🚀 Using Supabase Database');
+    pool = new SupabasePool();
+    break;
+  case 'local':
+    console.log('🐳 Using Local PostgreSQL Database');
+    pool = new Pool({
       connectionString: process.env.DATABASE_URL
     });
+    break;
+  case 'mock':
+  default:
+    console.log('⚠️  Using In-Memory Mock Database');
+    pool = new MockPool();
+    break;
+}
 
 /* -------------------------------------------------
    3️⃣  App & middleware
